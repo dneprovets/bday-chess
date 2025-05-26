@@ -93,6 +93,45 @@
             font-size: 15px;
         }
 
+        /* Sound Toggle Icon */
+        .sound-toggle {
+            cursor: pointer;
+            user-select: none;
+            transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            padding: 12px;
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 0.5px solid rgba(255, 255, 255, 0.2);
+            box-shadow:
+                0 1px 3px rgba(0, 0, 0, 0.1),
+                inset 0 1px 0 rgba(255, 255, 255, 0.1);
+            width: 50px;
+            height: 50px;
+            flex-shrink: 0;
+        }
+
+        .sound-toggle:hover {
+            background: rgba(255, 255, 255, 0.15);
+            transform: translateY(-1px);
+            box-shadow:
+                0 2px 8px rgba(0, 0, 0, 0.15),
+                inset 0 1px 0 rgba(255, 255, 255, 0.15);
+        }
+
+        .sound-toggle:active {
+            transform: translateY(0);
+            background: rgba(255, 255, 255, 0.05);
+            box-shadow:
+                0 1px 2px rgba(0, 0, 0, 0.1),
+                inset 0 1px 0 rgba(255, 255, 255, 0.05);
+        }
+
         /* Loading Screen */
         .loading-screen {
             position: absolute;
@@ -434,9 +473,16 @@
             max-width: 280px;
         }
 
-        /* Add spacing after primary button */
-        .control-button.primary {
-            margin-bottom: 8px;
+        .controls-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        /* Primary button in flex row */
+        .controls-row .control-button.primary {
+            flex: 1;
+            margin-bottom: 0;
         }
 
         .control-button {
@@ -760,8 +806,10 @@
                 </div>
 
                 <div class="game-controls">
-                    <button class="control-button primary" id="newGameBtn" onclick="newGame()">New Game</button>
-                    <button class="control-button" id="soundBtn" onclick="toggleSound()">Sound On</button>
+                    <div class="controls-row">
+                        <button class="control-button primary" id="newGameBtn" onclick="newGame()">New Game</button>
+                        <div class="sound-toggle" id="soundToggle" onclick="toggleSound()">🔊</div>
+                    </div>
                 </div>
             </div>
 
@@ -1208,10 +1256,6 @@
 
                 const newGameBtn = document.getElementById('newGameBtn');
                 if (newGameBtn) newGameBtn.textContent = TEXTS.game.buttons.newGame;
-
-
-                const soundBtn = document.getElementById('soundBtn');
-                if (soundBtn) soundBtn.textContent = TEXTS.game.buttons.soundOn;
             }
 
             initializeGame() {
@@ -1680,16 +1724,35 @@
             }
 
             newGame() {
-                this.logic.reset();
-                this.selectedSquare = null;
-                this.lastMove = null;
-                this.renderBoard();
-                this.updateGameStatus();
-                this.updateTurnIndicator();
-                this.clearHighlights();
-                this.clearLastMoveHighlight();
-                this.usedNotifications = []; // Reset notifications for new game
-                this.gameStarted = false; // Reset flag
+                // Show loading screen
+                const loadingScreen = document.getElementById('loadingScreen');
+                const mainContainer = document.getElementById('mainContainer');
+                if (loadingScreen && mainContainer) {
+                    loadingScreen.style.display = 'flex';
+                    mainContainer.style.display = 'none';
+                }
+                
+                // Reset game after a brief delay
+                setTimeout(() => {
+                    this.logic.reset();
+                    this.selectedSquare = null;
+                    this.lastMove = null;
+                    this.renderBoard();
+                    this.updateGameStatus();
+                    this.updateTurnIndicator();
+                    this.clearHighlights();
+                    this.clearLastMoveHighlight();
+                    this.usedNotifications = []; // Reset notifications for new game
+                    this.gameStarted = false; // Reset flag
+                    
+                    // Hide loading screen and show game
+                    setTimeout(() => {
+                        if (loadingScreen && mainContainer) {
+                            loadingScreen.style.display = 'none';
+                            mainContainer.style.display = 'flex';
+                        }
+                    }, 2000);
+                }, 100);
 
                 // Allow victory screen after 2 seconds
                 setTimeout(() => {
@@ -1743,11 +1806,9 @@
 
             toggleSound() {
                 this.soundEnabled = !this.soundEnabled;
-                const button = document.querySelector('.control-button:last-child');
-                if (button) {
-                    button.textContent = this.soundEnabled ?
-                        TEXTS.game.buttons.soundOn :
-                        TEXTS.game.buttons.soundOff;
+                const soundToggle = document.getElementById('soundToggle');
+                if (soundToggle) {
+                    soundToggle.textContent = this.soundEnabled ? '🔊' : '🔇';
                 }
             }
 
