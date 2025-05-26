@@ -863,24 +863,16 @@
             }
 
             initializeStockfish() {
-                // Check if we're running on HTTP server or file protocol
-                if (window.location.protocol === 'file:') {
-                    console.info('🎯 Running in fallback mode - enhanced intermediate AI active');
-                    console.info('💡 For Stockfish engine, run: python3 -m http.server 8000');
-                    this.engineReady = false;
-                    this.stockfish = null;
-                    return;
-                }
-                
                 try {
                     // Try to initialize Stockfish worker
+                    console.info('🚀 Attempting to initialize Stockfish engine...');
                     this.stockfish = new Worker('stockfish.js');
                     
                     this.stockfish.onmessage = (e) => {
                         const data = e.data;
                         if (data.startsWith('uciok')) {
                             this.engineReady = true;
-                            console.info('🚀 Stockfish engine initialized!');
+                            console.info('✅ Stockfish engine initialized successfully!');
                             // Configure Stockfish for intermediate level play
                             this.stockfish.postMessage('setoption name Hash value 16');
                             this.stockfish.postMessage('setoption name Threads value 1');
@@ -893,15 +885,16 @@
                     };
                     
                     this.stockfish.onerror = (error) => {
-                        console.warn('Stockfish worker error, using fallback:', error);
+                        console.warn('❌ Stockfish worker error, using fallback engine:', error);
                         this.engineReady = false;
                         this.stockfish = null;
                     };
                     
+                    // Start UCI communication
                     this.stockfish.postMessage('uci');
                     
                 } catch (error) {
-                    console.warn('Failed to initialize Stockfish, using enhanced fallback:', error);
+                    console.warn('❌ Failed to initialize Stockfish worker, using enhanced fallback engine:', error);
                     this.engineReady = false;
                     this.stockfish = null;
                 }
@@ -1047,8 +1040,11 @@
 
 
             getBestMoveAsync(callback) {
+                console.log('getBestMoveAsync called, engineReady:', this.engineReady, 'stockfish:', !!this.stockfish);
+                
                 if (this.stockfish && this.engineReady) {
                     // Use Stockfish for best move calculation with intermediate level settings
+                    console.log('Using Stockfish engine');
                     this.pendingCallback = callback;
                     
                     // Send current position to Stockfish
@@ -1061,8 +1057,10 @@
                     this.stockfish.postMessage(`go movetime ${Math.floor(thinkTime)}`);
                 } else {
                     // Enhanced fallback with intermediate-level logic
+                    console.log('Using enhanced fallback engine');
                     setTimeout(() => {
                         const fallbackMove = this.getIntermediateBestMove();
+                        console.log('Fallback move generated:', fallbackMove);
                         callback(fallbackMove);
                     }, 1000 + Math.random() * 1000); // Variable thinking time
                 }
@@ -1377,19 +1375,25 @@
             }
 
             makeAIMove() {
+                console.log('makeAIMove called, current player:', this.logic.getCurrentPlayer());
+                
                 // Show AI thinking indicator
                 const statusElement = document.getElementById('gameStatus');
                 if (statusElement) statusElement.textContent = TEXTS.game.status.aiThinking;
 
                 this.logic.getBestMoveAsync((move) => {
+                    console.log('AI move callback received:', move);
+                    
                     if (!move) {
                         // No moves available for AI, player wins
+                        console.log('No moves available for AI');
                         this.showVictoryScreen();
                         return;
                     }
 
                     const promotion = move.promotion || 'q'; // Default to queen
                     const result = this.logic.makeMove(move.from.row, move.from.col, move.to.row, move.to.col, promotion);
+                    console.log('AI move result:', result);
 
                     // Highlight the AI's last move
                     this.highlightLastMove(move.from, move.to);
