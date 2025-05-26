@@ -15,13 +15,15 @@
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif;
             background: #1a1a1a;
-            min-height: 100vh;
+            height: 100vh;
             display: flex;
             justify-content: center;
             align-items: center;
-            padding: 10px;
+            padding: 0;
+            margin: 0;
             -webkit-font-smoothing: antialiased;
             -moz-osx-font-smoothing: grayscale;
+            overflow: hidden;
         }
 
         /* iPhone Container */
@@ -32,10 +34,10 @@
             max-height: 812px;
             background: #000;
             border-radius: 40px;
-            padding: 4px;
+            padding: 3px;
             position: relative;
             box-shadow:
-                0 0 0 2px #333,
+                0 0 0 1px #333,
                 0 0 20px rgba(255, 255, 255, 0.1),
                 inset 0 0 0 1px #444;
             overflow: hidden;
@@ -59,39 +61,13 @@
             width: 100%;
             height: 100%;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border-radius: 36px;
+            border-radius: 37px;
             overflow: hidden;
             position: relative;
             display: flex;
             flex-direction: column;
         }
 
-        /* iOS Status Bar */
-        .status-bar {
-            height: 47px;
-            background: transparent;
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-end;
-            padding: 0 24px 8px;
-            color: #000;
-            font-weight: 600;
-            font-size: 17px;
-            z-index: 1000;
-        }
-
-        .status-left {
-            display: flex;
-            align-items: center;
-            gap: 5px;
-        }
-
-        .status-right {
-            display: flex;
-            align-items: center;
-            gap: 4px;
-            font-size: 15px;
-        }
 
         /* Sound Toggle Icon */
         .sound-toggle {
@@ -162,22 +138,24 @@
         /* Main Container */
         .container {
             flex: 1;
-            padding: 0 20px 20px;
+            padding: 10px 20px;
             display: flex;
             flex-direction: column;
+            justify-content: center;
             align-items: center;
-            gap: 12px;
+            gap: 8px;
             overflow-y: auto;
+            min-height: 0;
         }
 
         /* Game Title */
         .game-title {
             color: #fff;
-            font-size: 32px;
+            font-size: 28px;
             font-weight: 600;
             text-align: center;
             text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-            margin-bottom: 4px;
+            margin: 8px 0;
             letter-spacing: -0.5px;
             font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif;
         }
@@ -468,7 +446,7 @@
             display: flex;
             flex-direction: column;
             gap: 8px;
-            margin-top: 16px;
+            margin-top: 8px;
             width: 100%;
             max-width: 280px;
         }
@@ -745,17 +723,6 @@
 <body>
     <div class="iphone-container">
         <div class="iphone-screen">
-            <!-- iOS Status Bar -->
-            <div class="status-bar">
-                <div class="status-left">
-                    <span id="statusTime">15:38</span>
-                </div>
-                <div class="status-right">
-                    <span>📶</span>
-                    <span>LTE</span>
-                    <span>🔋 63%</span>
-                </div>
-            </div>
 
             <!-- Loading Screen -->
             <div class="loading-screen" id="loadingScreen">
@@ -843,9 +810,9 @@
                 "title": "FintechFarm Chess",
                 "status": {
                     "yourTurn": "Your turn",
-                    "aiThinking": "AI thinking...",
+                    "aiThinking": "Bank thinking...",
                     "checkYourTurn": "Check! Your turn",
-                    "checkAiThinking": "Check! AI thinking...",
+                    "checkAiThinking": "Check! Bank thinking...",
                     "checkmateYouWon": "Checkmate! You won!",
                     "checkmateYouLost": "Checkmate! You lost.",
                     "stalemate": "Stalemate - Draw!"
@@ -1259,10 +1226,6 @@
             }
 
             initializeGame() {
-                // Start the clock immediately
-                this.updateClock();
-                setInterval(() => this.updateClock(), 1000); // Update every second
-                
                 setTimeout(() => {
                     const loadingScreen = document.getElementById('loadingScreen');
                     const mainContainer = document.getElementById('mainContainer');
@@ -1274,18 +1237,6 @@
                 }, 3000);
             }
 
-            updateClock() {
-                const now = new Date();
-                const timeString = now.toLocaleTimeString('en-US', {
-                    hour12: false,
-                    hour: '2-digit',
-                    minute: '2-digit'
-                });
-                const timeElement = document.getElementById('statusTime');
-                if (timeElement) {
-                    timeElement.textContent = timeString;
-                }
-            }
 
             setupPromotionDialog() {
                 const promotionPieces = document.querySelectorAll('.promotion-piece');
