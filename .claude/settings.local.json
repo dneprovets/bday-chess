@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(rm:*)",
+      "WebFetch(domain:github.com)",
+      "Bash(open:*)",
+      "WebFetch(domain:unpkg.com)",
+      "Bash(curl:*)",
+      "Bash(npm install)",
+      "Bash(cp:*)",
+      "Bash(grep:*)",
+      "Bash(ls:*)",
+      "Bash(mv:*)"
+    ],
+    "deny": []
+  }
+}

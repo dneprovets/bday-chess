@@ -1,0 +1,1899 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chess Master 🦁</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦁</text></svg>">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            background: #1a1a1a;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 10px;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        /* iPhone Container */
+        .iphone-container {
+            width: min(375px, 100vw - 20px);
+            height: min(812px, 100vh - 20px);
+            max-width: 375px;
+            max-height: 812px;
+            background: #000;
+            border-radius: 40px;
+            padding: 4px;
+            position: relative;
+            box-shadow:
+                0 0 0 2px #333,
+                0 0 20px rgba(255, 255, 255, 0.1),
+                inset 0 0 0 1px #444;
+            overflow: hidden;
+        }
+
+        /* Dynamic Island */
+        .iphone-container::before {
+            content: '';
+            position: absolute;
+            top: 8px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 126px;
+            height: 37px;
+            background: #000;
+            border-radius: 20px;
+            z-index: 10000;
+        }
+
+        .iphone-screen {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 36px;
+            overflow: hidden;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* iOS Status Bar */
+        .status-bar {
+            height: 47px;
+            background: transparent;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            padding: 0 24px 8px;
+            color: #000;
+            font-weight: 600;
+            font-size: 17px;
+            z-index: 1000;
+        }
+
+        .status-left {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .status-right {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 15px;
+        }
+
+        /* Loading Screen */
+        .loading-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            border-radius: 36px;
+        }
+
+        .loading-logo {
+            width: 100px;
+            height: 100px;
+            object-fit: contain;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0.8; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.05); }
+        }
+
+        /* Main Container */
+        .container {
+            flex: 1;
+            padding: 0 20px 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+            overflow-y: auto;
+        }
+
+        /* Game Title */
+        .game-title {
+            color: #fff;
+            font-size: 32px;
+            font-weight: 600;
+            text-align: center;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+            margin-bottom: 4px;
+            letter-spacing: -0.5px;
+            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif;
+        }
+
+        /* Chess Board Container */
+        .board-container {
+            position: relative;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 16px;
+            box-shadow:
+                0 20px 40px rgba(0, 0, 0, 0.2),
+                0 4px 8px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .chess-board {
+            width: 280px;
+            height: 280px;
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            grid-template-rows: repeat(8, 1fr);
+            border-radius: 12px;
+            overflow: hidden;
+            position: relative;
+            box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.1);
+        }
+
+        .chess-square {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 22px;
+            cursor: pointer;
+            position: relative;
+            transition: all 0.2s ease;
+            user-select: none;
+        }
+
+        .chess-square:hover {
+            transform: scale(1.05);
+            z-index: 10;
+        }
+
+        .chess-square.selected {
+            box-shadow: inset 0 0 0 3px #007AFF;
+            transform: scale(1.05);
+        }
+
+        .chess-square.possible-move {
+            box-shadow: inset 0 0 0 2px #34C759;
+        }
+
+        .chess-square.possible-move::after {
+            content: '';
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            background: #34C759;
+            border-radius: 50%;
+            opacity: 0.8;
+        }
+
+        .chess-square.last-move {
+            box-shadow: inset 0 0 0 3px #FF9500;
+            background-color: rgba(255, 149, 0, 0.2) !important;
+        }
+
+        /* Piece styling */
+        .piece-black {
+            filter: grayscale(100%) brightness(0.4);
+            text-shadow: 0 0 3px rgba(255, 255, 255, 0.8);
+        }
+
+        .piece-white {
+            filter: brightness(1.2) saturate(1.3);
+            text-shadow: 0 0 2px rgba(0, 0, 0, 0.3);
+        }
+
+        /* Enhanced iOS-style notifications */
+        .notification {
+            position: absolute;
+            top: 60px;
+            left: 16px;
+            right: 16px;
+            background: rgba(28, 28, 30, 0.95);
+            color: #fff;
+            padding: 16px 20px;
+            border-radius: 16px;
+            font-size: 16px;
+            font-weight: 500;
+            text-align: left;
+            transform: translateY(-200px);
+            opacity: 0;
+            transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            z-index: 1001;
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 0.5px solid rgba(255, 255, 255, 0.1);
+            box-shadow:
+                0 4px 20px rgba(0, 0, 0, 0.3),
+                inset 0 1px 0 rgba(255, 255, 255, 0.1);
+            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif;
+            letter-spacing: -0.2px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .notification.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+
+        .notification.success {
+            background: rgba(52, 199, 89, 0.95);
+        }
+
+        .notification.warning {
+            background: rgba(255, 149, 0, 0.95);
+        }
+
+        .notification.error {
+            background: rgba(255, 59, 48, 0.95);
+        }
+
+        .notification.info {
+            background: rgba(0, 122, 255, 0.95);
+        }
+
+        .notification-icon {
+            font-size: 20px;
+            flex-shrink: 0;
+        }
+
+        .notification-content {
+            flex: 1;
+        }
+
+        .notification-title {
+            font-weight: 600;
+            font-size: 16px;
+            margin-bottom: 2px;
+        }
+
+        .notification-message {
+            font-weight: 400;
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        /* Push notification style */
+        .push-notification {
+            position: absolute;
+            top: 60px;
+            left: 16px;
+            right: 16px;
+            background: rgba(28, 28, 30, 0.98);
+            color: #fff;
+            padding: 20px;
+            border-radius: 20px;
+            transform: translateY(-300px) scale(0.95);
+            opacity: 0;
+            transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            z-index: 1002;
+            backdrop-filter: blur(30px);
+            -webkit-backdrop-filter: blur(30px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            box-shadow:
+                0 10px 40px rgba(0, 0, 0, 0.4),
+                0 2px 8px rgba(0, 0, 0, 0.2),
+                inset 0 1px 0 rgba(255, 255, 255, 0.15);
+            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif;
+        }
+
+        .push-notification.show {
+            transform: translateY(0) scale(1);
+            opacity: 1;
+        }
+
+        .push-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 8px;
+        }
+
+        .push-app-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+        }
+
+        .push-app-name {
+            font-weight: 600;
+            font-size: 14px;
+            opacity: 0.8;
+        }
+
+        .push-time {
+            margin-left: auto;
+            font-size: 14px;
+            opacity: 0.6;
+        }
+
+        .push-title {
+            font-weight: 600;
+            font-size: 16px;
+            margin-bottom: 4px;
+            letter-spacing: -0.2px;
+        }
+
+        .push-message {
+            font-weight: 400;
+            font-size: 15px;
+            line-height: 1.4;
+            opacity: 0.9;
+            letter-spacing: -0.1px;
+        }
+
+        /* Pawn promotion dialog */
+        .promotion-dialog {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+        }
+
+        .promotion-content {
+            background: rgba(28, 28, 30, 0.95);
+            border-radius: 20px;
+            padding: 30px;
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            text-align: center;
+        }
+
+        .promotion-title {
+            color: white;
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif;
+        }
+
+        .promotion-pieces {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+        }
+
+        .promotion-piece {
+            width: 80px;
+            height: 80px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            border-radius: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 40px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .promotion-piece:hover {
+            background: rgba(255, 255, 255, 0.2);
+            border-color: #007AFF;
+            transform: scale(1.1);
+        }
+
+        /* Game Controls */
+        .game-controls {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-top: 16px;
+            width: 100%;
+            max-width: 280px;
+        }
+
+        /* Add spacing after primary button */
+        .control-button.primary {
+            margin-bottom: 8px;
+        }
+
+        .control-button {
+            background: rgba(255, 255, 255, 0.1);
+            color: #007AFF;
+            border: none;
+            border-radius: 14px;
+            padding: 16px 20px;
+            font-size: 17px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 0.5px solid rgba(255, 255, 255, 0.2);
+            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif;
+            letter-spacing: -0.2px;
+            min-height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow:
+                0 1px 3px rgba(0, 0, 0, 0.1),
+                inset 0 1px 0 rgba(255, 255, 255, 0.1);
+        }
+
+        .control-button:hover {
+            background: rgba(255, 255, 255, 0.15);
+            transform: translateY(-1px);
+            box-shadow:
+                0 2px 8px rgba(0, 0, 0, 0.15),
+                inset 0 1px 0 rgba(255, 255, 255, 0.15);
+        }
+
+        .control-button:active {
+            transform: translateY(0);
+            background: rgba(255, 255, 255, 0.05);
+            box-shadow:
+                0 1px 2px rgba(0, 0, 0, 0.1),
+                inset 0 1px 0 rgba(255, 255, 255, 0.05);
+        }
+
+        /* Enhanced Primary button style */
+        .control-button.primary {
+            background: linear-gradient(135deg, #007AFF 0%, #0056CC 100%);
+            color: #fff;
+            border: 0.5px solid rgba(0, 122, 255, 0.4);
+            box-shadow:
+                0 4px 15px rgba(0, 122, 255, 0.3),
+                0 1px 3px rgba(0, 0, 0, 0.2),
+                inset 0 1px 0 rgba(255, 255, 255, 0.3);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .control-button.primary::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+            transition: left 0.5s;
+        }
+
+        .control-button.primary:hover::before {
+            left: 100%;
+        }
+
+        .control-button.primary:hover {
+            background: linear-gradient(135deg, #0056CC 0%, #003D99 100%);
+            transform: translateY(-2px) scale(1.02);
+            box-shadow:
+                0 8px 25px rgba(0, 122, 255, 0.4),
+                0 3px 8px rgba(0, 0, 0, 0.2),
+                inset 0 1px 0 rgba(255, 255, 255, 0.4);
+        }
+
+        .control-button.primary:active {
+            transform: translateY(0) scale(0.98);
+            background: linear-gradient(135deg, #003D99 0%, #002966 100%);
+            box-shadow:
+                0 2px 8px rgba(0, 122, 255, 0.3),
+                inset 0 1px 0 rgba(255, 255, 255, 0.2);
+        }
+
+        /* Secondary buttons - more subtle styling */
+        .control-button:not(.primary) {
+            background: rgba(255, 255, 255, 0.08);
+            color: rgba(255, 255, 255, 0.9);
+            font-weight: 500;
+        }
+
+        .control-button:not(.primary):hover {
+            background: rgba(255, 255, 255, 0.12);
+            color: #fff;
+        }
+
+        .control-button:not(.primary):active {
+            background: rgba(255, 255, 255, 0.06);
+        }
+
+        /* Victory Screen */
+        .victory-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 9998;
+            border-radius: 36px;
+        }
+
+        .victory-content {
+            text-align: center;
+            color: #fff;
+        }
+
+        .victory-emoji {
+            font-size: 120px;
+            margin-bottom: 20px;
+            animation: victoryPulse 2s ease-in-out infinite;
+        }
+
+        .victory-title {
+            font-size: 40px;
+            font-weight: 700;
+            margin-bottom: 20px;
+            text-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif;
+            letter-spacing: -0.5px;
+        }
+
+        @keyframes victoryPulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+
+        /* Fireworks */
+        .firework {
+            position: absolute;
+            width: 4px;
+            height: 4px;
+            border-radius: 50%;
+            animation: firework 1s ease-out forwards;
+        }
+
+        @keyframes firework {
+            0% {
+                opacity: 1;
+                transform: scale(1);
+            }
+            100% {
+                opacity: 0;
+                transform: scale(20);
+            }
+        }
+
+        /* Game Status */
+        .game-status {
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 17px;
+            font-weight: 500;
+            text-align: center;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+            margin-bottom: 8px;
+            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif;
+            letter-spacing: -0.2px;
+        }
+
+        /* Turn Indicator */
+        .turn-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #34C759;
+            animation: pulse-indicator 2s ease-in-out infinite;
+            margin: 0 auto 8px;
+        }
+
+        .turn-indicator.ai-turn {
+            background: #FF3B30;
+        }
+
+        @keyframes pulse-indicator {
+            0%, 100% { opacity: 0.6; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.2); }
+        }
+
+        /* Responsive Design */
+        @media (max-width: 414px) {
+            .iphone-container {
+                width: 100vw;
+                height: 100vh;
+                border-radius: 0;
+                max-width: none;
+                max-height: none;
+                padding: 0;
+            }
+
+            .iphone-container::before {
+                display: none;
+            }
+
+            .iphone-screen {
+                border-radius: 0;
+            }
+
+            .loading-screen, .victory-screen {
+                border-radius: 0;
+            }
+        }
+
+        @media (max-height: 700px) {
+            .game-title {
+                font-size: 28px;
+                margin-bottom: 2px;
+            }
+
+            .chess-board {
+                width: 240px;
+                height: 240px;
+            }
+
+            .chess-square {
+                font-size: 18px;
+            }
+
+            .control-button {
+                padding: 12px 16px;
+                font-size: 16px;
+                min-height: 44px;
+            }
+
+            .game-controls {
+                gap: 6px;
+                margin-top: 12px;
+            }
+        }
+
+        @media (max-width: 320px) {
+            .chess-board {
+                width: 260px;
+                height: 260px;
+            }
+
+            .container {
+                padding: 0 16px 16px;
+                gap: 8px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="iphone-container">
+        <div class="iphone-screen">
+            <!-- iOS Status Bar -->
+            <div class="status-bar">
+                <div class="status-left">
+                    <span>15:38</span>
+                </div>
+                <div class="status-right">
+                    <span>📶</span>
+                    <span>LTE</span>
+                    <span>🔋 63%</span>
+                </div>
+            </div>
+
+            <!-- Loading Screen -->
+            <div class="loading-screen" id="loadingScreen">
+                <img src="./content/ff-logo.png" alt="FintechFarm Logo" class="loading-logo">
+            </div>
+
+            <!-- Enhanced notifications -->
+            <div class="notification" id="notification">
+                <div class="notification-icon" id="notificationIcon">🦁</div>
+                <div class="notification-content">
+                    <div class="notification-title" id="notificationTitle">Notification</div>
+                    <div class="notification-message" id="notificationMessage"></div>
+                </div>
+            </div>
+
+            <!-- Push notification -->
+            <div class="push-notification" id="pushNotification">
+                <div class="push-header">
+                    <div class="push-app-icon">♟️</div>
+                    <div class="push-app-name">Chess Master</div>
+                    <div class="push-time" id="pushTime">now</div>
+                </div>
+                <div class="push-title" id="pushTitle">Game Update</div>
+                <div class="push-message" id="pushMessage">AI is analyzing your move...</div>
+            </div>
+
+            <!-- Pawn promotion dialog -->
+            <div class="promotion-dialog" id="promotionDialog">
+                <div class="promotion-content">
+                    <div class="promotion-title">Choose promotion piece</div>
+                    <div class="promotion-pieces">
+                        <div class="promotion-piece" data-piece="q">♕</div>
+                        <div class="promotion-piece" data-piece="r">♖</div>
+                        <div class="promotion-piece" data-piece="b">♗</div>
+                        <div class="promotion-piece" data-piece="n">♘</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Main Container -->
+            <div class="container" id="mainContainer" style="display: none;">
+                <h1 class="game-title" id="gameTitle">FintechFarm</h1>
+                <div class="turn-indicator" id="turnIndicator"></div>
+                <div class="game-status" id="gameStatus">Your turn</div>
+
+                <div class="board-container">
+                    <div class="chess-board" id="chessBoard"></div>
+                </div>
+
+                <div class="game-controls">
+                    <button class="control-button primary" id="newGameBtn" onclick="newGame()">New Game</button>
+                    <button class="control-button" id="soundBtn" onclick="toggleSound()">Sound On</button>
+                </div>
+            </div>
+
+            <!-- Victory Screen -->
+            <div class="victory-screen" id="victoryScreen">
+                <div class="victory-content">
+                    <div class="victory-emoji">🏆</div>
+                    <h1 class="victory-title" id="victoryTitle">Victory!</h1>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Audio Elements -->
+    <audio id="moveSound" preload="auto">
+        <source src="./content/loop.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="captureSound" preload="auto">
+        <source src="./content/roar.wav" type="audio/wav">
+    </audio>
+    <audio id="mateSound" preload="auto">
+        <source src="./content/mat.wav" type="audio/wav">
+    </audio>
+
+    <!-- Include chess.js library -->
+    <script src="./chess-browser.js"></script>
+
+    <script>
+        // TEXT CONSTANTS - Embedded to avoid CORS issues
+        const TEXTS = {
+            "game": {
+                "title": "FintechFarm Chess",
+                "status": {
+                    "yourTurn": "Your turn",
+                    "aiThinking": "AI thinking...",
+                    "checkYourTurn": "Check! Your turn",
+                    "checkAiThinking": "Check! AI thinking...",
+                    "checkmateYouWon": "Checkmate! You won!",
+                    "checkmateYouLost": "Checkmate! You lost.",
+                    "stalemate": "Stalemate - Draw!"
+                },
+                "buttons": {
+                    "newGame": "New Game",
+                    "soundOn": "Sound On",
+                    "soundOff": "Sound Off"
+                },
+                "victory": {
+                    "title": "Happy Birthday!"
+                },
+                "errors": {
+                    "chessNotLoaded": "Chess.js library not loaded",
+                    "noNotificationTexts": "No notification texts available",
+                    "soundPlayFailed": "Sound play failed",
+                    "textsLoadFailed": "Failed to load texts"
+                }
+            },
+            "notifications": [
+                "Мне нравится",
+                "Хватит в размеренном темпе жить",
+                "this is f...ng amazing result",
+                "Простите, мне не нравится",
+                "Очень скучно, но да ладно",
+                "Бесконечное ожидание",
+                "Мамочки",
+                "На все рынки, пожалуйста",
+                "Спасибо большое. Идите спать, пожалуйста",
+                "Никаких дилдо!",
+                "Секс и депозиты",
+                "Музыкой навеяло?",
+                "Напомните, пожалуйста, какой у нас статус?",
+                "Что-то мешает уже начать разработку?",
+                "Не осознавал..."
+            ],
+            "pieces": {
+                "K": "🐄", "Q": "🦅", "R": "🐋", "B": "🦓", "N": "🐪", "P": "🐣",
+                "k": "🐄", "q": "🦅", "r": "🐋", "b": "🦓", "n": "🐪", "p": "🐣"
+            },
+            "colors": {
+                "light": "#F0D9B5",
+                "dark": "#B58863"
+            }
+        };
+
+        // Extract constants for backwards compatibility
+        const NOTIFICATION_TEXTS = TEXTS.notifications;
+        const PIECE_EMOJIS = TEXTS.pieces;
+        const SQUARE_COLORS = TEXTS.colors;
+
+        // CHESS LOGIC MODULE using chess.js 1.2.0
+        class ChessLogic {
+            constructor() {
+                this.chess = new Chess();
+                // Strong AI without Web Workers
+                this.transpositionTable = new Map();
+                this.searchStartTime = 0;
+                this.maxSearchTime = 5000; // 5 seconds limit
+            }
+
+            squareToRowCol(square) {
+                const col = square.charCodeAt(0) - 'a'.charCodeAt(0);
+                const row = 8 - parseInt(square[1]);
+                return { row, col };
+            }
+
+            rowColToSquare(row, col) {
+                const file = String.fromCharCode('a'.charCodeAt(0) + col);
+                const rank = (8 - row).toString();
+                return file + rank;
+            }
+
+            getPiece(row, col) {
+                const square = this.rowColToSquare(row, col);
+                const piece = this.chess.get(square);
+                if (!piece) return null;
+
+                return piece.color === 'w' ? piece.type.toUpperCase() : piece.type.toLowerCase();
+            }
+
+            isValidMove(fromRow, fromCol, toRow, toCol) {
+                const from = this.rowColToSquare(fromRow, fromCol);
+                const to = this.rowColToSquare(toRow, toCol);
+
+                const moves = this.chess.moves({ square: from });
+
+                // Simple check: try the move
+                try {
+                    const result = this.chess.move({ from, to });
+                    if (result) {
+                        this.chess.undo();
+                        return true;
+                    }
+                } catch (e) {
+                    // Invalid move
+                }
+                return false;
+            }
+
+            getPossibleMoves(row, col) {
+                const square = this.rowColToSquare(row, col);
+                const moves = this.chess.moves({ square });
+
+                const possibleMoves = [];
+                for (const move of moves) {
+                    try {
+                        const moveObj = this.chess.move(move);
+                        if (moveObj) {
+                            const { row: toRow, col: toCol } = this.squareToRowCol(moveObj.to);
+                            possibleMoves.push({ row: toRow, col: toCol });
+                            this.chess.undo();
+                        }
+                    } catch (e) {
+                        // Skip invalid moves
+                    }
+                }
+
+                return possibleMoves;
+            }
+
+            makeMove(fromRow, fromCol, toRow, toCol, promotion = 'q') {
+                const from = this.rowColToSquare(fromRow, fromCol);
+                const to = this.rowColToSquare(toRow, toCol);
+                const piece = this.chess.get(from);
+
+                try {
+                    let move;
+
+                    // Check for pawn promotion
+                    if (piece && piece.type === 'p' && (toRow === 0 || toRow === 7)) {
+                        move = this.chess.move({ from, to, promotion: promotion });
+                    } else {
+                        move = this.chess.move({ from, to });
+                    }
+
+                    if (!move) return null;
+
+                    if (this.chess.isCheckmate()) {
+                        return 'checkmate';
+                    } else if (this.chess.isStalemate()) {
+                        return 'stalemate';
+                    } else if (this.chess.isCheck()) {
+                        return 'check';
+                    } else if (move.captured) {
+                        return 'capture';
+                    } else {
+                        return 'move';
+                    }
+                } catch (error) {
+                    return null;
+                }
+            }
+
+            // Reset the engine for a new game
+            reset() {
+                this.chess.reset();
+                if (this.stockfish && this.engineReady) {
+                    this.stockfish.postMessage('ucinewgame');
+                    this.stockfish.postMessage('position startpos');
+                }
+            }
+
+
+
+            getGamePhase() {
+                const position = this.chess.fen();
+                const moveCount = this.chess.history().length;
+
+                // Count pieces on board
+                let pieceCount = 0;
+                for (let i = 0; i < 8; i++) {
+                    for (let j = 0; j < 8; j++) {
+                        if (this.chess.get(String.fromCharCode(97 + j) + (8 - i))) {
+                            pieceCount++;
+                        }
+                    }
+                }
+
+                // Determine game phase
+                if (moveCount < 20) return 'opening';
+                if (pieceCount <= 12) return 'endgame';
+                return 'middlegame';
+            }
+
+            getBestMove() {
+                const moves = this.chess.moves();
+                if (moves.length === 0) return null;
+
+                // Start timing
+                this.searchStartTime = Date.now();
+
+                // Iterative deepening with time limit
+                let bestMove = null;
+                let bestValue = -Infinity;
+                const orderedMoves = this.orderMoves(moves);
+
+                // Start with depth 1 and increase until time runs out
+                for (let depth = 1; depth <= 8; depth++) {
+                    let currentBestMove = null;
+                    let currentBestValue = -Infinity;
+                    let searchCompleted = true;
+
+                    for (const move of orderedMoves) {
+                        // Check time limit
+                        if (Date.now() - this.searchStartTime > this.maxSearchTime) {
+                            searchCompleted = false;
+                            break;
+                        }
+
+                        try {
+                            const moveObj = this.chess.move(move);
+                            const moveValue = this.minimax(depth - 1, false, -Infinity, Infinity);
+                            this.chess.undo();
+
+                            if (moveValue > currentBestValue) {
+                                currentBestValue = moveValue;
+                                currentBestMove = moveObj;
+                            }
+                        } catch (e) {
+                            continue;
+                        }
+                    }
+
+                    // If we completed this depth, update best move
+                    if (searchCompleted && currentBestMove) {
+                        bestMove = currentBestMove;
+                        bestValue = currentBestValue;
+                    } else {
+                        // Time ran out, use previous best move
+                        break;
+                    }
+
+                    // If we found a mate, no need to search deeper
+                    if (Math.abs(bestValue) > 9000) {
+                        break;
+                    }
+                }
+
+                if (bestMove) {
+                    const { row: fromRow, col: fromCol } = this.squareToRowCol(bestMove.from);
+                    const { row: toRow, col: toCol } = this.squareToRowCol(bestMove.to);
+                    return { from: { row: fromRow, col: fromCol }, to: { row: toRow, col: toCol } };
+                }
+
+                // Fallback to first legal move
+                const fallbackMove = moves[0];
+                try {
+                    const moveObj = this.chess.move(fallbackMove);
+                    this.chess.undo();
+
+                    if (moveObj) {
+                        const { row: fromRow, col: fromCol } = this.squareToRowCol(moveObj.from);
+                        const { row: toRow, col: toCol } = this.squareToRowCol(moveObj.to);
+                        return { from: { row: fromRow, col: fromCol }, to: { row: toRow, col: toCol } };
+                    }
+                } catch (e) {
+                    return null;
+                }
+
+                return null;
+            }
+
+            // Advanced position evaluation
+            evaluatePosition() {
+                const board = this.chess.board();
+                let score = 0;
+
+                // Precise piece values
+                const pieceValues = {
+                    'p': 100, 'n': 320, 'b': 330, 'r': 500, 'q': 900, 'k': 20000
+                };
+
+                // Advanced piece-square tables
+                const pst = {
+                    'p': [
+                        [0,  0,  0,  0,  0,  0,  0,  0],
+                        [50, 50, 50, 50, 50, 50, 50, 50],
+                        [10, 10, 20, 30, 30, 20, 10, 10],
+                        [5,  5, 10, 27, 27, 10,  5,  5],
+                        [0,  0,  0, 25, 25,  0,  0,  0],
+                        [5, -5,-10,  0,  0,-10, -5,  5],
+                        [5, 10, 10,-25,-25, 10, 10,  5],
+                        [0,  0,  0,  0,  0,  0,  0,  0]
+                    ],
+                    'n': [
+                        [-50,-40,-30,-30,-30,-30,-40,-50],
+                        [-40,-20,  0,  0,  0,  0,-20,-40],
+                        [-30,  0, 10, 15, 15, 10,  0,-30],
+                        [-30,  5, 15, 20, 20, 15,  5,-30],
+                        [-30,  0, 15, 20, 20, 15,  0,-30],
+                        [-30,  5, 10, 15, 15, 10,  5,-30],
+                        [-40,-20,  0,  5,  5,  0,-20,-40],
+                        [-50,-40,-30,-30,-30,-30,-40,-50]
+                    ],
+                    'b': [
+                        [-20,-10,-10,-10,-10,-10,-10,-20],
+                        [-10,  0,  0,  0,  0,  0,  0,-10],
+                        [-10,  0,  5, 10, 10,  5,  0,-10],
+                        [-10,  5,  5, 10, 10,  5,  5,-10],
+                        [-10,  0, 10, 10, 10, 10,  0,-10],
+                        [-10, 10, 10, 10, 10, 10, 10,-10],
+                        [-10,  5,  0,  0,  0,  0,  5,-10],
+                        [-20,-10,-10,-10,-10,-10,-10,-20]
+                    ],
+                    'r': [
+                        [0,  0,  0,  0,  0,  0,  0,  0],
+                        [5, 10, 10, 10, 10, 10, 10,  5],
+                        [-5,  0,  0,  0,  0,  0,  0, -5],
+                        [-5,  0,  0,  0,  0,  0,  0, -5],
+                        [-5,  0,  0,  0,  0,  0,  0, -5],
+                        [-5,  0,  0,  0,  0,  0,  0, -5],
+                        [-5,  0,  0,  0,  0,  0,  0, -5],
+                        [0,  0,  0,  5,  5,  0,  0,  0]
+                    ],
+                    'q': [
+                        [-20,-10,-10, -5, -5,-10,-10,-20],
+                        [-10,  0,  0,  0,  0,  0,  0,-10],
+                        [-10,  0,  5,  5,  5,  5,  0,-10],
+                        [-5,  0,  5,  5,  5,  5,  0, -5],
+                        [0,  0,  5,  5,  5,  5,  0, -5],
+                        [-10,  5,  5,  5,  5,  5,  0,-10],
+                        [-10,  0,  5,  0,  0,  0,  0,-10],
+                        [-20,-10,-10, -5, -5,-10,-10,-20]
+                    ],
+                    'k': [
+                        [-30,-40,-40,-50,-50,-40,-40,-30],
+                        [-30,-40,-40,-50,-50,-40,-40,-30],
+                        [-30,-40,-40,-50,-50,-40,-40,-30],
+                        [-30,-40,-40,-50,-50,-40,-40,-30],
+                        [-20,-30,-30,-40,-40,-30,-30,-20],
+                        [-10,-20,-20,-20,-20,-20,-20,-10],
+                        [20, 20,  0,  0,  0,  0, 20, 20],
+                        [20, 30, 10,  0,  0, 10, 30, 20]
+                    ]
+                };
+
+                // Evaluate material and position
+                for (let row = 0; row < 8; row++) {
+                    for (let col = 0; col < 8; col++) {
+                        const piece = board[row][col];
+                        if (!piece) continue;
+
+                        const isWhite = piece.color === 'w';
+                        const pieceType = piece.type;
+                        const multiplier = isWhite ? 1 : -1;
+
+                        // Material value
+                        score += pieceValues[pieceType] * multiplier;
+
+                        // Positional value
+                        if (pst[pieceType]) {
+                            const tableRow = isWhite ? 7 - row : row;
+                            score += pst[pieceType][tableRow][col] * multiplier;
+                        }
+                    }
+                }
+
+                // Additional positional factors
+                score += this.evaluateKingSafety();
+                score += this.evaluatePawnStructure();
+                score += this.evaluateMobility();
+
+                return this.chess.turn() === 'w' ? score : -score;
+            }
+
+            evaluateKingSafety() {
+                let safety = 0;
+                const whiteKing = this.findKing('w');
+                const blackKing = this.findKing('b');
+
+                if (whiteKing) {
+                    const whiteMoves = this.chess.moves({ square: whiteKing }).length;
+                    safety -= whiteMoves * 3; // Penalty for exposed white king
+                }
+
+                if (blackKing) {
+                    const blackMoves = this.chess.moves({ square: blackKing }).length;
+                    safety += blackMoves * 3; // Penalty for exposed black king
+                }
+
+                return safety;
+            }
+
+            evaluatePawnStructure() {
+                let structure = 0;
+                const board = this.chess.board();
+
+                for (let col = 0; col < 8; col++) {
+                    let whitePawns = 0, blackPawns = 0;
+                    for (let row = 0; row < 8; row++) {
+                        const piece = board[row][col];
+                        if (piece && piece.type === 'p') {
+                            if (piece.color === 'w') whitePawns++;
+                            else blackPawns++;
+                        }
+                    }
+                    // Penalty for doubled pawns
+                    if (whitePawns > 1) structure -= (whitePawns - 1) * 15;
+                    if (blackPawns > 1) structure += (blackPawns - 1) * 15;
+                }
+                return structure;
+            }
+
+            evaluateMobility() {
+                const currentMoves = this.chess.moves().length;
+                return currentMoves * 2;
+            }
+
+            findKing(color) {
+                const board = this.chess.board();
+                for (let row = 0; row < 8; row++) {
+                    for (let col = 0; col < 8; col++) {
+                        const piece = board[row][col];
+                        if (piece && piece.type === 'k' && piece.color === color) {
+                            return String.fromCharCode(97 + col) + (8 - row);
+                        }
+                    }
+                }
+                return null;
+            }
+
+            // Minimax with alpha-beta pruning and time control
+            minimax(depth, isMaximizing, alpha, beta) {
+                // Check time limit
+                if (Date.now() - this.searchStartTime > this.maxSearchTime) {
+                    return this.evaluatePosition(); // Return current evaluation if time is up
+                }
+
+                const positionKey = this.chess.fen() + depth + isMaximizing;
+                if (this.transpositionTable.has(positionKey)) {
+                    return this.transpositionTable.get(positionKey);
+                }
+
+                // Limit transposition table size for performance
+                if (this.transpositionTable.size > 10000) {
+                    this.transpositionTable.clear();
+                }
+
+                if (depth === 0 || this.chess.isGameOver()) {
+                    const evaluation = this.evaluatePosition();
+                    this.transpositionTable.set(positionKey, evaluation);
+                    return evaluation;
+                }
+
+                const moves = this.chess.moves();
+
+                if (isMaximizing) {
+                    let maxEval = -Infinity;
+                    for (const move of moves) {
+                        // Check time limit during search
+                        if (Date.now() - this.searchStartTime > this.maxSearchTime) {
+                            break;
+                        }
+
+                        this.chess.move(move);
+                        const evaluation = this.minimax(depth - 1, false, alpha, beta);
+                        this.chess.undo();
+                        maxEval = Math.max(maxEval, evaluation);
+                        alpha = Math.max(alpha, evaluation);
+                        if (beta <= alpha) break; // Alpha-beta pruning
+                    }
+                    this.transpositionTable.set(positionKey, maxEval);
+                    return maxEval;
+                } else {
+                    let minEval = Infinity;
+                    for (const move of moves) {
+                        // Check time limit during search
+                        if (Date.now() - this.searchStartTime > this.maxSearchTime) {
+                            break;
+                        }
+
+                        this.chess.move(move);
+                        const evaluation = this.minimax(depth - 1, true, alpha, beta);
+                        this.chess.undo();
+                        minEval = Math.min(minEval, evaluation);
+                        beta = Math.min(beta, evaluation);
+                        if (beta <= alpha) break; // Alpha-beta pruning
+                    }
+                    this.transpositionTable.set(positionKey, minEval);
+                    return minEval;
+                }
+            }
+
+            // Order moves for better alpha-beta pruning
+            orderMoves(moves) {
+                const captures = [];
+                const checks = [];
+                const normal = [];
+
+                for (const move of moves) {
+                    try {
+                        const moveObj = this.chess.move(move);
+
+                        if (moveObj.captured) {
+                            captures.push(move);
+                        } else if (this.chess.isCheck()) {
+                            checks.push(move);
+                        } else {
+                            normal.push(move);
+                        }
+
+                        this.chess.undo();
+                    } catch (e) {
+                        normal.push(move);
+                    }
+                }
+
+                return [...captures, ...checks, ...normal];
+            }
+
+
+
+            isGameOver() { return this.chess.isGameOver(); }
+            isCheck() { return this.chess.isCheck(); }
+            isCheckmate() { return this.chess.isCheckmate(); }
+            isStalemate() { return this.chess.isStalemate(); }
+            getCurrentPlayer() { return this.chess.turn() === 'w' ? 'white' : 'black'; }
+            reset() {
+                this.chess.reset();
+                this.transpositionTable.clear(); // Clear cache for new game
+            }
+        }
+
+        // CHESS VIEW MODULE
+        class ChessView {
+            constructor() {
+                this.logic = new ChessLogic();
+                this.selectedSquare = null;
+                this.soundEnabled = true;
+                this.usedNotifications = []; // Track used notifications for non-repeating
+                this.gameStarted = false; // Flag to prevent premature victory screen
+                this.lastMove = null; // Track last move for highlighting
+                this.notificationTimeout = null; // Track notification timeout
+                this.pendingPromotion = null; // Track pending pawn promotion
+
+                this.initializeGame();
+                this.setupPromotionDialog();
+
+                // Allow victory screen after 2 seconds
+                setTimeout(() => {
+                    this.gameStarted = true;
+                }, 2000);
+            }
+
+            updateUITexts() {
+                if (!TEXTS) return;
+
+                // Update static UI elements
+                const gameTitle = document.getElementById('gameTitle');
+                if (gameTitle) gameTitle.textContent = TEXTS.game.title;
+
+                const victoryTitle = document.getElementById('victoryTitle');
+                if (victoryTitle) victoryTitle.textContent = TEXTS.game.victory.title;
+
+                const newGameBtn = document.getElementById('newGameBtn');
+                if (newGameBtn) newGameBtn.textContent = TEXTS.game.buttons.newGame;
+
+
+                const soundBtn = document.getElementById('soundBtn');
+                if (soundBtn) soundBtn.textContent = TEXTS.game.buttons.soundOn;
+            }
+
+            initializeGame() {
+                setTimeout(() => {
+                    const loadingScreen = document.getElementById('loadingScreen');
+                    const mainContainer = document.getElementById('mainContainer');
+                    if (loadingScreen) loadingScreen.style.display = 'none';
+                    if (mainContainer) mainContainer.style.display = 'flex';
+                    this.updateUITexts();
+                    this.renderBoard();
+                    this.updateGameStatus();
+                }, 3000);
+            }
+
+            setupPromotionDialog() {
+                const promotionPieces = document.querySelectorAll('.promotion-piece');
+                promotionPieces.forEach(piece => {
+                    piece.addEventListener('click', (e) => {
+                        const selectedPiece = e.target.dataset.piece;
+                        this.handlePromotionChoice(selectedPiece);
+                    });
+                });
+            }
+
+            renderBoard() {
+                const boardElement = document.getElementById('chessBoard');
+                if (!boardElement) return;
+
+                boardElement.innerHTML = '';
+
+                for (let row = 0; row < 8; row++) {
+                    for (let col = 0; col < 8; col++) {
+                        const square = document.createElement('div');
+                        square.className = 'chess-square';
+                        square.dataset.row = row.toString();
+                        square.dataset.col = col.toString();
+
+                        const isLight = (row + col) % 2 === 0;
+                        square.style.backgroundColor = isLight ? SQUARE_COLORS.light : SQUARE_COLORS.dark;
+
+                        // Add last move highlighting
+                        if (this.lastMove) {
+                            if ((this.lastMove.from.row === row && this.lastMove.from.col === col) ||
+                                (this.lastMove.to.row === row && this.lastMove.to.col === col)) {
+                                square.classList.add('last-move');
+                            }
+                        }
+
+                        const piece = this.logic.getPiece(row, col);
+                        if (piece) {
+                            const emoji = PIECE_EMOJIS[piece.toUpperCase()];
+                            const span = document.createElement('span');
+                            span.textContent = emoji;
+
+                            if (piece === piece.toLowerCase()) {
+                                span.className = 'piece-black';
+                            } else {
+                                span.className = 'piece-white';
+                            }
+
+                            square.appendChild(span);
+                        }
+
+                        square.addEventListener('click', () => this.handleSquareClick(row, col));
+                        boardElement.appendChild(square);
+                    }
+                }
+
+                this.addCountryBorders();
+            }
+
+            addCountryBorders() {
+                const boardContainer = document.querySelector('.board-container');
+                if (!boardContainer) return;
+
+                boardContainer.style.borderTop = '3px solid #00A3E0';
+                boardContainer.style.borderRight = '3px solid #DA251D';
+                boardContainer.style.borderBottom = '3px solid #FF9933';
+                boardContainer.style.borderLeft = '3px solid #E8112D';
+            }
+
+            handleSquareClick(row, col) {
+                if (this.logic.isGameOver() || this.logic.getCurrentPlayer() !== 'white') return;
+
+                const piece = this.logic.getPiece(row, col);
+
+                if (this.selectedSquare) {
+                    if (this.logic.isValidMove(this.selectedSquare.row, this.selectedSquare.col, row, col)) {
+                        const fromSquare = { row: this.selectedSquare.row, col: this.selectedSquare.col };
+                        const toSquare = { row, col };
+
+                        // Check if this is a pawn promotion
+                        const piece = this.logic.getPiece(this.selectedSquare.row, this.selectedSquare.col);
+                        const isPromotion = piece && piece.toLowerCase() === 'p' && (row === 0 || row === 7);
+
+                        if (isPromotion) {
+                            // Store the move for later execution
+                            this.pendingPromotion = {
+                                from: fromSquare,
+                                to: toSquare
+                            };
+                            this.selectedSquare = null;
+                            this.clearHighlights();
+                            this.showPromotionDialog();
+                            return;
+                        }
+
+                        const result = this.logic.makeMove(this.selectedSquare.row, this.selectedSquare.col, row, col);
+                        this.selectedSquare = null;
+                        this.clearHighlights();
+
+                        // Highlight the last move
+                        this.highlightLastMove(fromSquare, toSquare);
+
+                        this.playSound(result);
+                        if (result === 'capture') {
+                            this.showRandomNotification();
+                        } else if (result === 'check') {
+                            this.showCheckNotification();
+                        }
+
+                        this.renderBoard();
+                        this.updateGameStatus();
+
+                        if (result === 'checkmate') {
+                            // Player just moved and caused checkmate, so player wins
+                            this.showVictoryScreen();
+                        } else if (!this.logic.isGameOver()) {
+                            this.updateTurnIndicator();
+                            setTimeout(() => this.makeAIMove(), 1500);
+                        }
+                    } else {
+                        this.selectedSquare = null;
+                        this.clearHighlights();
+
+                        if (piece && piece === piece.toUpperCase()) {
+                            this.selectedSquare = { row, col };
+                            this.highlightSquare(row, col);
+                            this.showPossibleMoves(row, col);
+                        }
+                    }
+                } else {
+                    if (piece && piece === piece.toUpperCase()) {
+                        this.selectedSquare = { row, col };
+                        this.highlightSquare(row, col);
+                        this.showPossibleMoves(row, col);
+                    }
+                }
+            }
+
+            highlightSquare(row, col) {
+                const square = document.querySelector(`[data-row="${row}"][data-col="${col}"]`);
+                if (square) square.classList.add('selected');
+            }
+
+            clearHighlights() {
+                document.querySelectorAll('.chess-square').forEach(square => {
+                    square.classList.remove('selected', 'possible-move');
+                });
+            }
+
+            clearLastMoveHighlight() {
+                document.querySelectorAll('.chess-square').forEach(square => {
+                    square.classList.remove('last-move');
+                });
+            }
+
+            highlightLastMove(from, to) {
+                this.lastMove = { from, to };
+                // The highlighting will be applied when renderBoard() is called
+            }
+
+            showPossibleMoves(row, col) {
+                const possibleMoves = this.logic.getPossibleMoves(row, col);
+
+                possibleMoves.forEach(move => {
+                    const square = document.querySelector(`[data-row="${move.row}"][data-col="${move.col}"]`);
+                    if (square) square.classList.add('possible-move');
+                });
+            }
+
+            makeAIMove() {
+                const move = this.logic.getBestMove();
+
+                if (!move) {
+                    // No moves available for AI, player wins
+                    this.showVictoryScreen();
+                    return;
+                }
+
+                const result = this.logic.makeMove(move.from.row, move.from.col, move.to.row, move.to.col);
+
+                // Highlight the AI's last move
+                this.highlightLastMove(move.from, move.to);
+
+                this.playSound(result);
+                this.renderBoard();
+                this.updateGameStatus();
+                this.updateTurnIndicator();
+            }
+
+            updateGameStatus() {
+                const statusElement = document.getElementById('gameStatus');
+                if (!statusElement) return;
+
+                if (this.logic.isGameOver()) {
+                    if (this.logic.isCheckmate()) {
+                        statusElement.textContent = this.logic.getCurrentPlayer() === 'white' ?
+                            TEXTS.game.status.checkmateYouLost :
+                            TEXTS.game.status.checkmateYouWon;
+                    } else {
+                        statusElement.textContent = TEXTS.game.status.stalemate;
+                    }
+                } else if (this.logic.isCheck()) {
+                    statusElement.textContent = this.logic.getCurrentPlayer() === 'white' ?
+                        TEXTS.game.status.checkYourTurn :
+                        TEXTS.game.status.checkAiThinking;
+                } else {
+                    statusElement.textContent = this.logic.getCurrentPlayer() === 'white' ?
+                        TEXTS.game.status.yourTurn :
+                        TEXTS.game.status.aiThinking;
+                }
+            }
+
+            updateTurnIndicator() {
+                const indicator = document.getElementById('turnIndicator');
+                if (!indicator) return;
+
+                if (this.logic.getCurrentPlayer() === 'white') {
+                    indicator.classList.remove('ai-turn');
+                } else {
+                    indicator.classList.add('ai-turn');
+                }
+            }
+
+            playSound(type) {
+                if (!this.soundEnabled) return;
+
+                let audio;
+                switch (type) {
+                    case 'move':
+                    case 'check':
+                        // No sound for regular moves and checks
+                        return;
+                    case 'capture':
+                        audio = document.getElementById('captureSound');
+                        break;
+                    case 'checkmate': // Only checkmate plays applause
+                        audio = document.getElementById('mateSound');
+                        break;
+                }
+
+                if (audio) {
+                    audio.currentTime = 0;
+                    audio.play().catch(e => console.log(TEXTS.game.errors.soundPlayFailed, e));
+                }
+            }
+
+            showRandomNotification() {
+                const notification = document.getElementById('notification');
+                const iconEl = document.getElementById('notificationIcon');
+                const titleEl = document.getElementById('notificationTitle');
+                const messageEl = document.getElementById('notificationMessage');
+
+                if (!notification) return;
+
+                // NOTIFICATION_TEXTS should be populated
+                if (NOTIFICATION_TEXTS.length === 0) {
+                    console.error(TEXTS.game.errors.noNotificationTexts);
+                    return;
+                }
+
+                // Non-repeating randomizer - reset when all used
+                if (this.usedNotifications.length >= NOTIFICATION_TEXTS.length) {
+                    this.usedNotifications = [];
+                }
+
+                // Get available notifications (not yet used)
+                const availableTexts = NOTIFICATION_TEXTS.filter((text, index) =>
+                    !this.usedNotifications.includes(index)
+                );
+
+                if (availableTexts.length === 0) {
+                    console.error(TEXTS.game.errors.noNotificationTexts);
+                    return;
+                }
+
+                // Pick random from available
+                const randomText = availableTexts[Math.floor(Math.random() * availableTexts.length)];
+
+                // Mark as used
+                const originalIndex = NOTIFICATION_TEXTS.indexOf(randomText);
+                this.usedNotifications.push(originalIndex);
+
+                // Set notification content with lion emoji
+                if (iconEl) iconEl.textContent = '🦁';
+                if (titleEl) titleEl.textContent = randomText; // Use random message as title
+                if (messageEl) messageEl.textContent = ''; // Clear the message area
+
+                // Show notification
+                notification.classList.add('show');
+
+                // Auto-hide after 3 seconds
+                if (this.notificationTimeout) {
+                    clearTimeout(this.notificationTimeout);
+                }
+                this.notificationTimeout = setTimeout(() => {
+                    notification.classList.remove('show');
+                }, 3000);
+            }
+
+            showCheckNotification() {
+                const notification = document.getElementById('notification');
+                const iconEl = document.getElementById('notificationIcon');
+                const titleEl = document.getElementById('notificationTitle');
+                const messageEl = document.getElementById('notificationMessage');
+
+                if (!notification) return;
+
+                // Use the same collection of phrases as captures
+                if (NOTIFICATION_TEXTS.length === 0) {
+                    console.error(TEXTS.game.errors.noNotificationTexts);
+                    return;
+                }
+
+                // Pick random from your collection
+                const randomText = NOTIFICATION_TEXTS[Math.floor(Math.random() * NOTIFICATION_TEXTS.length)];
+
+                // Set notification content with warning emoji
+                if (iconEl) iconEl.textContent = '⚠️';
+                if (titleEl) titleEl.textContent = randomText;
+                if (messageEl) messageEl.textContent = ''; // Clear the message area
+
+                // Show notification
+                notification.classList.add('show');
+
+                // Auto-hide after 3 seconds
+                if (this.notificationTimeout) {
+                    clearTimeout(this.notificationTimeout);
+                }
+                this.notificationTimeout = setTimeout(() => {
+                    notification.classList.remove('show');
+                }, 3000);
+            }
+
+            showNotification(icon, title, message, type = 'info') {
+                const notification = document.getElementById('notification');
+                const iconEl = document.getElementById('notificationIcon');
+                const titleEl = document.getElementById('notificationTitle');
+                const messageEl = document.getElementById('notificationMessage');
+
+                if (!notification) return;
+
+                // Set content
+                iconEl.textContent = icon;
+                titleEl.textContent = title;
+                messageEl.textContent = message;
+
+                // Set type
+                notification.className = `notification ${type}`;
+                notification.classList.add('show');
+
+                setTimeout(() => {
+                    notification.classList.remove('show');
+                }, 3000);
+            }
+
+            showPushNotification(title, message, duration = 4000) {
+                const pushNotification = document.getElementById('pushNotification');
+                const titleEl = document.getElementById('pushTitle');
+                const messageEl = document.getElementById('pushMessage');
+                const timeEl = document.getElementById('pushTime');
+
+                if (!pushNotification) return;
+
+                // Set content
+                titleEl.textContent = title;
+                messageEl.textContent = message;
+                timeEl.textContent = 'now';
+
+                // Show notification
+                pushNotification.classList.add('show');
+
+                setTimeout(() => {
+                    pushNotification.classList.remove('show');
+                }, duration);
+            }
+
+            showVictoryScreen() {
+                // Don't show victory screen if game just started
+                if (!this.gameStarted) {
+                    return;
+                }
+
+                if (this.soundEnabled) {
+                    this.playSound('checkmate');
+                }
+
+                const victoryScreen = document.getElementById('victoryScreen');
+                if (victoryScreen) {
+                    victoryScreen.style.display = 'flex';
+                    this.createFireworks();
+
+                    setTimeout(() => {
+                        victoryScreen.style.display = 'none';
+                        this.newGame();
+                    }, 5000);
+                }
+            }
+
+            createFireworks() {
+                const colors = ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff', '#ffa500'];
+                const container = document.querySelector('.iphone-screen');
+
+                for (let i = 0; i < 30; i++) {
+                    setTimeout(() => {
+                        const firework = document.createElement('div');
+                        firework.className = 'firework';
+                        firework.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                        firework.style.left = Math.random() * 360 + 'px';
+                        firework.style.top = Math.random() * 700 + 'px';
+
+                        container.appendChild(firework);
+
+                        setTimeout(() => {
+                            firework.remove();
+                        }, 1000);
+                    }, i * 100);
+                }
+            }
+
+            newGame() {
+                this.logic.reset();
+                this.selectedSquare = null;
+                this.lastMove = null;
+                this.renderBoard();
+                this.updateGameStatus();
+                this.updateTurnIndicator();
+                this.clearHighlights();
+                this.clearLastMoveHighlight();
+                this.usedNotifications = []; // Reset notifications for new game
+                this.gameStarted = false; // Reset flag
+
+                // Allow victory screen after 2 seconds
+                setTimeout(() => {
+                    this.gameStarted = true;
+                }, 2000);
+            }
+
+            showPromotionDialog() {
+                const dialog = document.getElementById('promotionDialog');
+                if (dialog) {
+                    dialog.style.display = 'flex';
+                }
+            }
+
+            hidePromotionDialog() {
+                const dialog = document.getElementById('promotionDialog');
+                if (dialog) {
+                    dialog.style.display = 'none';
+                }
+            }
+
+            handlePromotionChoice(piece) {
+                if (!this.pendingPromotion) return;
+
+                const { from, to } = this.pendingPromotion;
+                const result = this.logic.makeMove(from.row, from.col, to.row, to.col, piece);
+
+                this.hidePromotionDialog();
+                this.pendingPromotion = null;
+
+                // Highlight the last move
+                this.highlightLastMove(from, to);
+
+                this.playSound(result);
+                if (result === 'capture') {
+                    this.showRandomNotification();
+                } else if (result === 'check') {
+                    this.showCheckNotification();
+                }
+
+                this.renderBoard();
+                this.updateGameStatus();
+
+                if (result === 'checkmate') {
+                    this.showVictoryScreen();
+                } else if (!this.logic.isGameOver()) {
+                    this.updateTurnIndicator();
+                    setTimeout(() => this.makeAIMove(), 1500);
+                }
+            }
+
+            toggleSound() {
+                this.soundEnabled = !this.soundEnabled;
+                const button = document.querySelector('.control-button:last-child');
+                if (button) {
+                    button.textContent = this.soundEnabled ?
+                        TEXTS.game.buttons.soundOn :
+                        TEXTS.game.buttons.soundOff;
+                }
+            }
+
+        }
+
+        // GLOBAL FUNCTIONS
+        function newGame() {
+            if (window.chessGame) {
+                window.chessGame.newGame();
+            }
+        }
+
+        function toggleSound() {
+            if (window.chessGame) {
+                window.chessGame.toggleSound();
+            }
+        }
+
+
+        // INITIALIZE GAME
+        document.addEventListener('DOMContentLoaded', () => {
+            // Wait a moment for chess.js to load
+            setTimeout(() => {
+                if (typeof Chess !== 'undefined') {
+                    window.chessGame = new ChessView();
+                    // Update UI texts after game is created
+                    if (window.chessGame) {
+                        window.chessGame.updateUITexts();
+                    }
+                } else {
+                    console.error(TEXTS.game.errors.chessNotLoaded);
+                }
+            }, 100);
+        });
+    </script>
+</body>
+</html>
