@@ -870,6 +870,8 @@
                     
                     this.stockfish.onmessage = (e) => {
                         const data = e.data;
+                        console.log('📩 Stockfish message:', data);
+                        
                         if (data.startsWith('uciok')) {
                             this.engineReady = true;
                             console.info('✅ Stockfish engine initialized successfully!');
@@ -880,6 +882,7 @@
                             this.stockfish.postMessage('setoption name Depth value 8');
                             this.stockfish.postMessage('ucinewgame');
                         } else if (data.startsWith('bestmove')) {
+                            console.log('🎯 Best move received:', data);
                             this.handleBestMove(data);
                         }
                     };
@@ -1049,12 +1052,28 @@
                     
                     // Send current position to Stockfish
                     const fen = this.chess.fen();
+                    console.log('📤 Sending position to Stockfish:', fen);
                     this.stockfish.postMessage(`position fen ${fen}`);
                     
                     // Shorter thinking time for more human-like play
                     // Add some randomness to make it less predictable
                     const thinkTime = 1500 + Math.random() * 1000; // 1.5-2.5 seconds
-                    this.stockfish.postMessage(`go movetime ${Math.floor(thinkTime)}`);
+                    const goCommand = `go movetime ${Math.floor(thinkTime)}`;
+                    console.log('📤 Sending go command:', goCommand);
+                    this.stockfish.postMessage(goCommand);
+                    
+                    // Add timeout fallback in case Stockfish gets stuck
+                    setTimeout(() => {
+                        if (this.pendingCallback) {
+                            console.warn('⚠️ Stockfish timeout, falling back to enhanced engine');
+                            const fallbackMove = this.getIntermediateBestMove();
+                            if (this.pendingCallback) {
+                                this.pendingCallback(fallbackMove);
+                                this.pendingCallback = null;
+                            }
+                        }
+                    }, 5000); // 5 second timeout
+                    
                 } else {
                     // Enhanced fallback with intermediate-level logic
                     console.log('Using enhanced fallback engine');
