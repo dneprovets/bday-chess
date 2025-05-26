@@ -1,0 +1,23 @@
+name = "bday-chess"
+compatibility_date = "2024-05-26"
+
+[env.production]
+routes = ["your-domain.pages.dev/*"]
+
+[[headers]]
+for = "/*"
+[headers.values]
+Cross-Origin-Embedder-Policy = "credentialless"
+Cross-Origin-Opener-Policy = "same-origin"
+
+[[headers]]  
+for = "*.js"
+[headers.values]
+Content-Type = "application/javascript"
+Cross-Origin-Resource-Policy = "same-origin"
+
+[[headers]]
+for = "*.wasm"  
+[headers.values]
+Content-Type = "application/wasm"
+Cross-Origin-Resource-Policy = "same-origin"
