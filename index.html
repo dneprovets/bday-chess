@@ -702,7 +702,7 @@
             <!-- iOS Status Bar -->
             <div class="status-bar">
                 <div class="status-left">
-                    <span>15:38</span>
+                    <span id="statusTime">15:38</span>
                 </div>
                 <div class="status-right">
                     <span>📶</span>
@@ -1215,6 +1215,10 @@
             }
 
             initializeGame() {
+                // Start the clock immediately
+                this.updateClock();
+                setInterval(() => this.updateClock(), 1000); // Update every second
+                
                 setTimeout(() => {
                     const loadingScreen = document.getElementById('loadingScreen');
                     const mainContainer = document.getElementById('mainContainer');
@@ -1224,6 +1228,19 @@
                     this.renderBoard();
                     this.updateGameStatus();
                 }, 3000);
+            }
+
+            updateClock() {
+                const now = new Date();
+                const timeString = now.toLocaleTimeString('en-US', {
+                    hour12: false,
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+                const timeElement = document.getElementById('statusTime');
+                if (timeElement) {
+                    timeElement.textContent = timeString;
+                }
             }
 
             setupPromotionDialog() {
