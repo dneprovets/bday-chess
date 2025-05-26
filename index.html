@@ -776,9 +776,6 @@
     </div>
 
     <!-- Audio Elements -->
-    <audio id="moveSound" preload="auto">
-        <source src="./content/loop.mp3" type="audio/mpeg">
-    </audio>
     <audio id="captureSound" preload="auto">
         <source src="./content/roar.wav" type="audio/wav">
     </audio>
@@ -788,6 +785,8 @@
 
     <!-- Include chess.js library -->
     <script src="./chess-browser.js"></script>
+    <!-- Include Stockfish engine -->
+    <script src="./stockfish.js"></script>
 
     <script>
         // TEXT CONSTANTS - Embedded to avoid CORS issues
@@ -850,14 +849,62 @@
         const PIECE_EMOJIS = TEXTS.pieces;
         const SQUARE_COLORS = TEXTS.colors;
 
-        // CHESS LOGIC MODULE using chess.js 1.2.0
+        // CHESS LOGIC MODULE using chess.js 1.2.0 + Stockfish
+        // Note: We need BOTH libraries:
+        // - chess.js: Handles game state, move validation, rules, checkmate detection
+        // - stockfish.js: Provides AI move calculation only
         class ChessLogic {
             constructor() {
-                this.chess = new Chess();
-                // Strong AI without Web Workers
-                this.transpositionTable = new Map();
-                this.searchStartTime = 0;
-                this.maxSearchTime = 5000; // 5 seconds limit
+                this.chess = new Chess(); // Game state and rules
+                this.stockfish = null;    // AI move calculator
+                this.engineReady = false;
+                this.pendingCallback = null;
+                this.initializeStockfish();
+            }
+
+            initializeStockfish() {
+                // Check if we're running on HTTP server or file protocol
+                if (window.location.protocol === 'file:') {
+                    console.info('🎯 Running in fallback mode - enhanced intermediate AI active');
+                    console.info('💡 For Stockfish engine, run: python3 -m http.server 8000');
+                    this.engineReady = false;
+                    this.stockfish = null;
+                    return;
+                }
+                
+                try {
+                    // Try to initialize Stockfish worker
+                    this.stockfish = new Worker('stockfish.js');
+                    
+                    this.stockfish.onmessage = (e) => {
+                        const data = e.data;
+                        if (data.startsWith('uciok')) {
+                            this.engineReady = true;
+                            console.info('🚀 Stockfish engine initialized!');
+                            // Configure Stockfish for intermediate level play
+                            this.stockfish.postMessage('setoption name Hash value 16');
+                            this.stockfish.postMessage('setoption name Threads value 1');
+                            this.stockfish.postMessage('setoption name Skill Level value 10');
+                            this.stockfish.postMessage('setoption name Depth value 8');
+                            this.stockfish.postMessage('ucinewgame');
+                        } else if (data.startsWith('bestmove')) {
+                            this.handleBestMove(data);
+                        }
+                    };
+                    
+                    this.stockfish.onerror = (error) => {
+                        console.warn('Stockfish worker error, using fallback:', error);
+                        this.engineReady = false;
+                        this.stockfish = null;
+                    };
+                    
+                    this.stockfish.postMessage('uci');
+                    
+                } catch (error) {
+                    console.warn('Failed to initialize Stockfish, using enhanced fallback:', error);
+                    this.engineReady = false;
+                    this.stockfish = null;
+                }
             }
 
             squareToRowCol(square) {
@@ -883,13 +930,20 @@
             isValidMove(fromRow, fromCol, toRow, toCol) {
                 const from = this.rowColToSquare(fromRow, fromCol);
                 const to = this.rowColToSquare(toRow, toCol);
-
-                const moves = this.chess.moves({ square: from });
+                const piece = this.chess.get(from);
 
                 // Simple check: try the move
                 try {
-                    const result = this.chess.move({ from, to });
-                    if (result) {
+                    let moveObj;
+                    
+                    // Handle pawn promotion - try with a promotion piece
+                    if (piece && piece.type === 'p' && (toRow === 0 || toRow === 7)) {
+                        moveObj = this.chess.move({ from, to, promotion: 'q' });
+                    } else {
+                        moveObj = this.chess.move({ from, to });
+                    }
+                    
+                    if (moveObj) {
                         this.chess.undo();
                         return true;
                     }
@@ -954,6 +1008,33 @@
             }
 
             // Reset the engine for a new game
+            handleBestMove(message) {
+                // Parse bestmove response: "bestmove e2e4" or "bestmove e7e8q"
+                const parts = message.split(' ');
+                if (parts.length >= 2 && parts[1] !== '(none)') {
+                    const moveStr = parts[1];
+                    const from = moveStr.substring(0, 2);
+                    const to = moveStr.substring(2, 4);
+                    const promotion = moveStr.length > 4 ? moveStr[4] : null;
+                    
+                    const { row: fromRow, col: fromCol } = this.squareToRowCol(from);
+                    const { row: toRow, col: toCol } = this.squareToRowCol(to);
+                    
+                    if (this.pendingCallback) {
+                        this.pendingCallback({ 
+                            from: { row: fromRow, col: fromCol }, 
+                            to: { row: toRow, col: toCol },
+                            promotion: promotion
+                        });
+                        this.pendingCallback = null;
+                    }
+                } else if (this.pendingCallback) {
+                    // No move found, return fallback
+                    this.pendingCallback(null);
+                    this.pendingCallback = null;
+                }
+            }
+
             reset() {
                 this.chess.reset();
                 if (this.stockfish && this.engineReady) {
@@ -964,351 +1045,109 @@
 
 
 
-            getGamePhase() {
-                const position = this.chess.fen();
-                const moveCount = this.chess.history().length;
 
-                // Count pieces on board
-                let pieceCount = 0;
-                for (let i = 0; i < 8; i++) {
-                    for (let j = 0; j < 8; j++) {
-                        if (this.chess.get(String.fromCharCode(97 + j) + (8 - i))) {
-                            pieceCount++;
-                        }
-                    }
+            getBestMoveAsync(callback) {
+                if (this.stockfish && this.engineReady) {
+                    // Use Stockfish for best move calculation with intermediate level settings
+                    this.pendingCallback = callback;
+                    
+                    // Send current position to Stockfish
+                    const fen = this.chess.fen();
+                    this.stockfish.postMessage(`position fen ${fen}`);
+                    
+                    // Shorter thinking time for more human-like play
+                    // Add some randomness to make it less predictable
+                    const thinkTime = 1500 + Math.random() * 1000; // 1.5-2.5 seconds
+                    this.stockfish.postMessage(`go movetime ${Math.floor(thinkTime)}`);
+                } else {
+                    // Enhanced fallback with intermediate-level logic
+                    setTimeout(() => {
+                        const fallbackMove = this.getIntermediateBestMove();
+                        callback(fallbackMove);
+                    }, 1000 + Math.random() * 1000); // Variable thinking time
                 }
-
-                // Determine game phase
-                if (moveCount < 20) return 'opening';
-                if (pieceCount <= 12) return 'endgame';
-                return 'middlegame';
             }
 
-            getBestMove() {
-                const moves = this.chess.moves();
+            getIntermediateBestMove() {
+                const moves = this.chess.moves({ verbose: true });
                 if (moves.length === 0) return null;
 
-                // Start timing
-                this.searchStartTime = Date.now();
-
-                // Iterative deepening with time limit
-                let bestMove = null;
-                let bestValue = -Infinity;
-                const orderedMoves = this.orderMoves(moves);
-
-                // Start with depth 1 and increase until time runs out
-                for (let depth = 1; depth <= 8; depth++) {
-                    let currentBestMove = null;
-                    let currentBestValue = -Infinity;
-                    let searchCompleted = true;
-
-                    for (const move of orderedMoves) {
-                        // Check time limit
-                        if (Date.now() - this.searchStartTime > this.maxSearchTime) {
-                            searchCompleted = false;
-                            break;
-                        }
-
-                        try {
-                            const moveObj = this.chess.move(move);
-                            const moveValue = this.minimax(depth - 1, false, -Infinity, Infinity);
-                            this.chess.undo();
-
-                            if (moveValue > currentBestValue) {
-                                currentBestValue = moveValue;
-                                currentBestMove = moveObj;
-                            }
-                        } catch (e) {
-                            continue;
-                        }
-                    }
-
-                    // If we completed this depth, update best move
-                    if (searchCompleted && currentBestMove) {
-                        bestMove = currentBestMove;
-                        bestValue = currentBestValue;
-                    } else {
-                        // Time ran out, use previous best move
-                        break;
-                    }
-
-                    // If we found a mate, no need to search deeper
-                    if (Math.abs(bestValue) > 9000) {
-                        break;
-                    }
-                }
-
-                if (bestMove) {
-                    const { row: fromRow, col: fromCol } = this.squareToRowCol(bestMove.from);
-                    const { row: toRow, col: toCol } = this.squareToRowCol(bestMove.to);
-                    return { from: { row: fromRow, col: fromCol }, to: { row: toRow, col: toCol } };
-                }
-
-                // Fallback to first legal move
-                const fallbackMove = moves[0];
-                try {
-                    const moveObj = this.chess.move(fallbackMove);
+                // Enhanced intermediate-level evaluation
+                const captures = moves.filter(move => move.captured);
+                const checks = moves.filter(move => {
+                    const testMove = this.chess.move(move);
+                    const isCheck = this.chess.isCheck();
                     this.chess.undo();
+                    return isCheck;
+                });
+                const checkmates = moves.filter(move => {
+                    const testMove = this.chess.move(move);
+                    const isMate = this.chess.isCheckmate();
+                    this.chess.undo();
+                    return isMate;
+                });
+                const centerMoves = moves.filter(move => {
+                    const to = move.to;
+                    return ['d4', 'd5', 'e4', 'e5', 'c4', 'c5', 'f4', 'f5'].includes(to);
+                });
+                const developmentMoves = moves.filter(move => {
+                    return ['n', 'b'].includes(move.piece) && 
+                           !['a', 'h'].includes(move.to[0]) && // avoid edge moves
+                           !['1', '8'].includes(move.to[1]);   // avoid back rank
+                });
+                const castlingMoves = moves.filter(move => move.flags.includes('k') || move.flags.includes('q'));
+                
+                // Advanced piece value calculation
+                const goodCaptures = captures.filter(move => {
+                    const pieceValues = { 'p': 1, 'n': 3, 'b': 3, 'r': 5, 'q': 9 };
+                    const capturedValue = pieceValues[move.captured] || 0;
+                    const movingValue = pieceValues[move.piece] || 0;
+                    return capturedValue >= movingValue; // Only take if good trade
+                });
 
-                    if (moveObj) {
-                        const { row: fromRow, col: fromCol } = this.squareToRowCol(moveObj.from);
-                        const { row: toRow, col: toCol } = this.squareToRowCol(moveObj.to);
-                        return { from: { row: fromRow, col: fromCol }, to: { row: toRow, col: toCol } };
-                    }
-                } catch (e) {
-                    return null;
-                }
-
-                return null;
-            }
-
-            // Advanced position evaluation
-            evaluatePosition() {
-                const board = this.chess.board();
-                let score = 0;
-
-                // Precise piece values
-                const pieceValues = {
-                    'p': 100, 'n': 320, 'b': 330, 'r': 500, 'q': 900, 'k': 20000
-                };
-
-                // Advanced piece-square tables
-                const pst = {
-                    'p': [
-                        [0,  0,  0,  0,  0,  0,  0,  0],
-                        [50, 50, 50, 50, 50, 50, 50, 50],
-                        [10, 10, 20, 30, 30, 20, 10, 10],
-                        [5,  5, 10, 27, 27, 10,  5,  5],
-                        [0,  0,  0, 25, 25,  0,  0,  0],
-                        [5, -5,-10,  0,  0,-10, -5,  5],
-                        [5, 10, 10,-25,-25, 10, 10,  5],
-                        [0,  0,  0,  0,  0,  0,  0,  0]
-                    ],
-                    'n': [
-                        [-50,-40,-30,-30,-30,-30,-40,-50],
-                        [-40,-20,  0,  0,  0,  0,-20,-40],
-                        [-30,  0, 10, 15, 15, 10,  0,-30],
-                        [-30,  5, 15, 20, 20, 15,  5,-30],
-                        [-30,  0, 15, 20, 20, 15,  0,-30],
-                        [-30,  5, 10, 15, 15, 10,  5,-30],
-                        [-40,-20,  0,  5,  5,  0,-20,-40],
-                        [-50,-40,-30,-30,-30,-30,-40,-50]
-                    ],
-                    'b': [
-                        [-20,-10,-10,-10,-10,-10,-10,-20],
-                        [-10,  0,  0,  0,  0,  0,  0,-10],
-                        [-10,  0,  5, 10, 10,  5,  0,-10],
-                        [-10,  5,  5, 10, 10,  5,  5,-10],
-                        [-10,  0, 10, 10, 10, 10,  0,-10],
-                        [-10, 10, 10, 10, 10, 10, 10,-10],
-                        [-10,  5,  0,  0,  0,  0,  5,-10],
-                        [-20,-10,-10,-10,-10,-10,-10,-20]
-                    ],
-                    'r': [
-                        [0,  0,  0,  0,  0,  0,  0,  0],
-                        [5, 10, 10, 10, 10, 10, 10,  5],
-                        [-5,  0,  0,  0,  0,  0,  0, -5],
-                        [-5,  0,  0,  0,  0,  0,  0, -5],
-                        [-5,  0,  0,  0,  0,  0,  0, -5],
-                        [-5,  0,  0,  0,  0,  0,  0, -5],
-                        [-5,  0,  0,  0,  0,  0,  0, -5],
-                        [0,  0,  0,  5,  5,  0,  0,  0]
-                    ],
-                    'q': [
-                        [-20,-10,-10, -5, -5,-10,-10,-20],
-                        [-10,  0,  0,  0,  0,  0,  0,-10],
-                        [-10,  0,  5,  5,  5,  5,  0,-10],
-                        [-5,  0,  5,  5,  5,  5,  0, -5],
-                        [0,  0,  5,  5,  5,  5,  0, -5],
-                        [-10,  5,  5,  5,  5,  5,  0,-10],
-                        [-10,  0,  5,  0,  0,  0,  0,-10],
-                        [-20,-10,-10, -5, -5,-10,-10,-20]
-                    ],
-                    'k': [
-                        [-30,-40,-40,-50,-50,-40,-40,-30],
-                        [-30,-40,-40,-50,-50,-40,-40,-30],
-                        [-30,-40,-40,-50,-50,-40,-40,-30],
-                        [-30,-40,-40,-50,-50,-40,-40,-30],
-                        [-20,-30,-30,-40,-40,-30,-30,-20],
-                        [-10,-20,-20,-20,-20,-20,-20,-10],
-                        [20, 20,  0,  0,  0,  0, 20, 20],
-                        [20, 30, 10,  0,  0, 10, 30, 20]
-                    ]
-                };
-
-                // Evaluate material and position
-                for (let row = 0; row < 8; row++) {
-                    for (let col = 0; col < 8; col++) {
-                        const piece = board[row][col];
-                        if (!piece) continue;
-
-                        const isWhite = piece.color === 'w';
-                        const pieceType = piece.type;
-                        const multiplier = isWhite ? 1 : -1;
-
-                        // Material value
-                        score += pieceValues[pieceType] * multiplier;
-
-                        // Positional value
-                        if (pst[pieceType]) {
-                            const tableRow = isWhite ? 7 - row : row;
-                            score += pst[pieceType][tableRow][col] * multiplier;
-                        }
-                    }
-                }
-
-                // Additional positional factors
-                score += this.evaluateKingSafety();
-                score += this.evaluatePawnStructure();
-                score += this.evaluateMobility();
-
-                return this.chess.turn() === 'w' ? score : -score;
-            }
-
-            evaluateKingSafety() {
-                let safety = 0;
-                const whiteKing = this.findKing('w');
-                const blackKing = this.findKing('b');
-
-                if (whiteKing) {
-                    const whiteMoves = this.chess.moves({ square: whiteKing }).length;
-                    safety -= whiteMoves * 3; // Penalty for exposed white king
-                }
-
-                if (blackKing) {
-                    const blackMoves = this.chess.moves({ square: blackKing }).length;
-                    safety += blackMoves * 3; // Penalty for exposed black king
-                }
-
-                return safety;
-            }
-
-            evaluatePawnStructure() {
-                let structure = 0;
-                const board = this.chess.board();
-
-                for (let col = 0; col < 8; col++) {
-                    let whitePawns = 0, blackPawns = 0;
-                    for (let row = 0; row < 8; row++) {
-                        const piece = board[row][col];
-                        if (piece && piece.type === 'p') {
-                            if (piece.color === 'w') whitePawns++;
-                            else blackPawns++;
-                        }
-                    }
-                    // Penalty for doubled pawns
-                    if (whitePawns > 1) structure -= (whitePawns - 1) * 15;
-                    if (blackPawns > 1) structure += (blackPawns - 1) * 15;
-                }
-                return structure;
-            }
-
-            evaluateMobility() {
-                const currentMoves = this.chess.moves().length;
-                return currentMoves * 2;
-            }
-
-            findKing(color) {
-                const board = this.chess.board();
-                for (let row = 0; row < 8; row++) {
-                    for (let col = 0; col < 8; col++) {
-                        const piece = board[row][col];
-                        if (piece && piece.type === 'k' && piece.color === color) {
-                            return String.fromCharCode(97 + col) + (8 - row);
-                        }
-                    }
-                }
-                return null;
-            }
-
-            // Minimax with alpha-beta pruning and time control
-            minimax(depth, isMaximizing, alpha, beta) {
-                // Check time limit
-                if (Date.now() - this.searchStartTime > this.maxSearchTime) {
-                    return this.evaluatePosition(); // Return current evaluation if time is up
-                }
-
-                const positionKey = this.chess.fen() + depth + isMaximizing;
-                if (this.transpositionTable.has(positionKey)) {
-                    return this.transpositionTable.get(positionKey);
-                }
-
-                // Limit transposition table size for performance
-                if (this.transpositionTable.size > 10000) {
-                    this.transpositionTable.clear();
-                }
-
-                if (depth === 0 || this.chess.isGameOver()) {
-                    const evaluation = this.evaluatePosition();
-                    this.transpositionTable.set(positionKey, evaluation);
-                    return evaluation;
-                }
-
-                const moves = this.chess.moves();
-
-                if (isMaximizing) {
-                    let maxEval = -Infinity;
-                    for (const move of moves) {
-                        // Check time limit during search
-                        if (Date.now() - this.searchStartTime > this.maxSearchTime) {
-                            break;
-                        }
-
-                        this.chess.move(move);
-                        const evaluation = this.minimax(depth - 1, false, alpha, beta);
-                        this.chess.undo();
-                        maxEval = Math.max(maxEval, evaluation);
-                        alpha = Math.max(alpha, evaluation);
-                        if (beta <= alpha) break; // Alpha-beta pruning
-                    }
-                    this.transpositionTable.set(positionKey, maxEval);
-                    return maxEval;
+                let selectedMove;
+                
+                // Decision making with strategic priorities
+                const rand = Math.random();
+                
+                if (checkmates.length > 0) {
+                    // Always take checkmate
+                    selectedMove = checkmates[0];
+                } else if (goodCaptures.length > 0 && rand < 0.8) {
+                    // 80% chance to take good captures
+                    selectedMove = goodCaptures[Math.floor(Math.random() * goodCaptures.length)];
+                } else if (checks.length > 0 && rand < 0.6) {
+                    // 60% chance to give check
+                    selectedMove = checks[Math.floor(Math.random() * checks.length)];
+                } else if (castlingMoves.length > 0 && rand < 0.7) {
+                    // 70% chance to castle when available
+                    selectedMove = castlingMoves[0];
+                } else if (centerMoves.length > 0 && rand < 0.6) {
+                    // 60% chance to play center moves
+                    selectedMove = centerMoves[Math.floor(Math.random() * centerMoves.length)];
+                } else if (developmentMoves.length > 0 && rand < 0.8) {
+                    // 80% chance to develop pieces
+                    selectedMove = developmentMoves[Math.floor(Math.random() * developmentMoves.length)];
                 } else {
-                    let minEval = Infinity;
-                    for (const move of moves) {
-                        // Check time limit during search
-                        if (Date.now() - this.searchStartTime > this.maxSearchTime) {
-                            break;
-                        }
-
-                        this.chess.move(move);
-                        const evaluation = this.minimax(depth - 1, true, alpha, beta);
-                        this.chess.undo();
-                        minEval = Math.min(minEval, evaluation);
-                        beta = Math.min(beta, evaluation);
-                        if (beta <= alpha) break; // Alpha-beta pruning
-                    }
-                    this.transpositionTable.set(positionKey, minEval);
-                    return minEval;
-                }
-            }
-
-            // Order moves for better alpha-beta pruning
-            orderMoves(moves) {
-                const captures = [];
-                const checks = [];
-                const normal = [];
-
-                for (const move of moves) {
-                    try {
-                        const moveObj = this.chess.move(move);
-
-                        if (moveObj.captured) {
-                            captures.push(move);
-                        } else if (this.chess.isCheck()) {
-                            checks.push(move);
-                        } else {
-                            normal.push(move);
-                        }
-
-                        this.chess.undo();
-                    } catch (e) {
-                        normal.push(move);
-                    }
+                    // Random move otherwise
+                    selectedMove = moves[Math.floor(Math.random() * moves.length)];
                 }
 
-                return [...captures, ...checks, ...normal];
+                const { row: fromRow, col: fromCol } = this.squareToRowCol(selectedMove.from);
+                const { row: toRow, col: toCol } = this.squareToRowCol(selectedMove.to);
+                return { from: { row: fromRow, col: fromCol }, to: { row: toRow, col: toCol } };
             }
+
+            // Keep simple version for backwards compatibility
+            getSimpleBestMove() {
+                return this.getIntermediateBestMove();
+            }
+
+            // Sync version for backwards compatibility
+            getBestMove() {
+                return this.getSimpleBestMove();
+            }
+
 
 
 
@@ -1317,10 +1156,6 @@
             isCheckmate() { return this.chess.isCheckmate(); }
             isStalemate() { return this.chess.isStalemate(); }
             getCurrentPlayer() { return this.chess.turn() === 'w' ? 'white' : 'black'; }
-            reset() {
-                this.chess.reset();
-                this.transpositionTable.clear(); // Clear cache for new game
-            }
         }
 
         // CHESS VIEW MODULE
@@ -1451,12 +1286,12 @@
                         const fromSquare = { row: this.selectedSquare.row, col: this.selectedSquare.col };
                         const toSquare = { row, col };
 
-                        // Check if this is a pawn promotion
+                        // Check if this is a pawn promotion (only after confirming the move is valid)
                         const piece = this.logic.getPiece(this.selectedSquare.row, this.selectedSquare.col);
                         const isPromotion = piece && piece.toLowerCase() === 'p' && (row === 0 || row === 7);
 
                         if (isPromotion) {
-                            // Store the move for later execution
+                            // Store the move for later execution (includes both regular promotions and promotion captures)
                             this.pendingPromotion = {
                                 from: fromSquare,
                                 to: toSquare
@@ -1542,23 +1377,36 @@
             }
 
             makeAIMove() {
-                const move = this.logic.getBestMove();
+                // Show AI thinking indicator
+                const statusElement = document.getElementById('gameStatus');
+                if (statusElement) statusElement.textContent = TEXTS.game.status.aiThinking;
 
-                if (!move) {
-                    // No moves available for AI, player wins
-                    this.showVictoryScreen();
-                    return;
-                }
+                this.logic.getBestMoveAsync((move) => {
+                    if (!move) {
+                        // No moves available for AI, player wins
+                        this.showVictoryScreen();
+                        return;
+                    }
 
-                const result = this.logic.makeMove(move.from.row, move.from.col, move.to.row, move.to.col);
+                    const promotion = move.promotion || 'q'; // Default to queen
+                    const result = this.logic.makeMove(move.from.row, move.from.col, move.to.row, move.to.col, promotion);
 
-                // Highlight the AI's last move
-                this.highlightLastMove(move.from, move.to);
+                    // Highlight the AI's last move
+                    this.highlightLastMove(move.from, move.to);
 
-                this.playSound(result);
-                this.renderBoard();
-                this.updateGameStatus();
-                this.updateTurnIndicator();
+                    this.playSound(result);
+                    this.renderBoard();
+                    this.updateGameStatus();
+                    this.updateTurnIndicator();
+
+                    // Check for game end conditions
+                    if (result === 'checkmate') {
+                        // AI won
+                        setTimeout(() => {
+                            this.updateGameStatus();
+                        }, 500);
+                    }
+                });
             }
 
             updateGameStatus() {

@@ -4,11 +4,11 @@ A beautiful, modern chess game with a strong AI opponent, built with vanilla Jav
 
 ## Features
 
-🎯 **Strong AI Opponent**
-- Advanced minimax algorithm with alpha-beta pruning
-- Iterative deepening with 5-second time limit
-- Sophisticated position evaluation
-- Adaptive search depth based on game phase
+🎯 **Dual AI System**
+- **Full Mode**: Stockfish WebAssembly (requires HTTP server)
+- **Fallback Mode**: Enhanced intermediate engine (direct file opening)
+- Checkmate detection and strategic play
+- Good capture evaluation and piece development
 
 🎨 **Beautiful iOS Design**
 - Modern glassmorphism interface
@@ -36,29 +36,48 @@ A beautiful, modern chess game with a strong AI opponent, built with vanilla Jav
 
 ## How to Play
 
-1. Open `index.html` in your web browser
+### Quick Start (Enhanced Fallback Engine)
+1. Open `index.html` directly in your web browser
 2. Wait for the FintechFarm logo loading screen
 3. Click on a piece to select it
 4. Click on a highlighted square to move
 5. For pawn promotion, choose your desired piece from the dialog
-6. Enjoy playing against the strong AI!
+6. Enjoy playing against the enhanced AI!
+
+### Full Stockfish Engine (Recommended)
+For the strongest AI experience, run with a local server:
+```bash
+# Navigate to the game directory
+cd /path/to/bday-chess
+
+# Start a local server (choose one):
+python3 -m http.server 8000
+# OR
+node -e "require('http').createServer(require('fs').readFile.bind(require('fs'))).listen(8000)"
+# OR
+npx serve .
+
+# Open in browser
+open http://localhost:8000
+```
 
 ## Technical Details
 
-- **Engine**: Custom JavaScript chess engine using chess.js library
-- **AI**: Minimax with alpha-beta pruning, transposition tables
-- **Time Control**: 5-second maximum thinking time per move
-- **Search Depth**: 1-8 plies with iterative deepening
-- **Evaluation**: Material + positional + king safety + pawn structure
+- **Game Logic**: chess.js library (move validation, rules, game state)
+- **AI Engine**: Stockfish WebAssembly (move calculation only)
+- **Memory**: Optimized with 16MB hash limit and single thread
+- **AI Level**: Intermediate (Skill Level 10, Depth 8)
+- **Fallback**: Enhanced engine when Stockfish unavailable
+- **UI**: Modern iOS-style interface with smooth animations
 
 ## Files Structure
 
 ```
 ├── index.html          # Main game file
 ├── chess-browser.js    # Chess.js library
+├── stockfish.js        # Stockfish WebAssembly engine
 ├── content/
 │   ├── ff-logo.png    # FintechFarm logo
-│   ├── loop.mp3       # Move sound (unused)
 │   ├── mat.wav        # Checkmate applause
 │   └── roar.wav       # Capture sound
 └── README.md          # This file
@@ -74,8 +93,8 @@ A beautiful, modern chess game with a strong AI opponent, built with vanilla Jav
 ## Credits
 
 - Chess logic: [chess.js](https://github.com/jhlywa/chess.js)
+- AI Engine: [Stockfish](https://stockfishchess.org/) WebAssembly
 - Design: Custom iOS-inspired interface
-- AI: Custom minimax implementation
 - Sounds: Custom audio effects
 
 ---
